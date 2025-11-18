@@ -44,7 +44,7 @@ Built with **Flutter**, the app runs smoothly on **Android, iOS, Windows, macOS,
 ## 📱 Screenshots & Demo
 
 ### 🎥 Video Demo
-Watch the full demo on Vimeo:  
+Watch the full demo on Vimeo:
 👉 https://vimeo.com/1138052827
 
 ### Local Video Link
@@ -53,14 +53,15 @@ Watch the full demo on Vimeo:
 ### 🖼️ Interface Gallery
 Images inside the `Mockups/` folder:
 
-![Dashboard](Mockups/1.png)
-![Transaction List](Mockups/2.png)
-![Add Expense](Mockups/3.png)
-![Category Breakdown](Mockups/4.png)
-![Settings](Mockups/5.png)
+<div align="center">
+  <img src="Mockups/1.png" alt="Dashboard" width="200" style="display: inline-block;">
+  <img src="Mockups/2.png" alt="Transaction List" width="200" style="display: inline-block;">
+  <img src="Mockups/3.png" alt="Add Expense" width="200" style="display: inline-block;">
+  <img src="Mockups/4.png" alt="Category Breakdown" width="200" style="display: inline-block;">
+  <img src="Mockups/5.png" alt="Settings" width="200" style="display: inline-block;">
+</div>
 
 ---
-
 ## ⚙️ Getting Started
 
 ### 📥 Quick Download (Android APK)
@@ -137,3 +138,4 @@ Portfolio: https://abdallah.driouich.site
 ## 📝 License
 Licensed under the **MIT License**.  
 See `LICENSE` for details.
+
