@@ -51,7 +51,7 @@ Built with **Flutter**, the app runs smoothly on **Android, iOS, Windows, macOS,
 Watch the full demo on Vimeo:
 👉 [
   // This is the image of the video player
-  ![Video Thumbnail - Click to Watch!](Mockups/1.png)
+  ![Video Thumbnail - Click to Watch!](Mockups/thumb.png)
 ]
   // This is the link to the actual video URL
 (https://vimeo.com/1138052827)
@@ -147,6 +147,7 @@ Portfolio: https://abdallah.driouich.site
 ## 📝 License
 Licensed under the **MIT License**.  
 See `LICENSE` for details.
+
 
 
 
