@@ -4,8 +4,7 @@
 ![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Finance](https://img.shields.io/badge/Finance-006400?style=for-the-badge&logo=data%20science&logoColor=white)
 ![fl_chart](https://img.shields.io/badge/fl_chart-2E8B57?style=for-the-badge&logo=chartdotjs&logoColor=white)
-![Mobile Development](https://img.shields.io/badge/Mobile%20Development-333333?style=for-the-badge&logo=android&logoColor=white)
-![Android Studio](https://img.shields.io/badge/Android%20Studio-3DDC84?style=for-the-badge&logo=android%20studio&logoColor=white)
+
 ## 💡 About Cash-In-Out
 Cash-In-Out is a simple, elegant, and powerful cross-platform application that helps you track your income and expenses with ease. Instead of dealing with complicated spreadsheets, this app gives you a clean and focused way to monitor your cash flow at any moment.
 
@@ -143,6 +142,7 @@ Portfolio: https://abdallah.driouich.site
 ## 📝 License
 Licensed under the **MIT License**.  
 See `LICENSE` for details.
+
 
 
 
