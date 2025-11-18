@@ -10,9 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.2
-  fl_chart: ^0.68.0
+  # fl_chart: ^0.68.0
   share_plus: ^7.2.1
-  intl: ^0.19.0
+  intl: ^0.20.2
   google_fonts: ^6.1.0
   animations: ^2.0.8
   url_launcher: ^6.2.5
@@ -20,6 +20,7 @@ dependencies:
   timezone: ^0.10.1
   flutter_localizations:
     sdk: flutter
+  syncfusion_flutter_charts: ^31.2.10
 
 dev_dependencies:
   flutter_test:
@@ -31,6 +32,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/fonts/
     - assets/splash.png
     - assets/icon.png
 

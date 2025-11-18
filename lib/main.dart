@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:fl_chart/fl_chart.dart';
+// --- MODIFIED --- (Removed fl_chart, added syncfusion_flutter_charts)
+// import 'package:fl_chart/fl_chart.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,11 +28,15 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  // Unique IDs for the two daily notifications
+  // --- MODIFIED --- (Unique IDs for 5 daily notifications)
   static const int morningNotificationId = 1001;
-  static const int eveningNotificationId = 1002;
+  static const int middayNotificationId = 1002;
+  static const int afternoonNotificationId = 1003;
+  static const int eveningNotificationId = 1004;
+  static const int nightNotificationId = 1005;
+
   static const String channelId = 'daily_motivation_channel';
-  static const String channelName = 'Daily Motivation';
+  static const String channelName = 'cashinout Motivation';
   static const String channelDescription =
       'Daily reminders to log income and expenses.';
 
@@ -84,81 +90,170 @@ class NotificationService {
     return scheduledDate;
   }
 
+  // --- MODIFIED --- (Complete rewrite to load data and schedule 5 notifs)
   Future<void> scheduleDailyNotifications(AppLocalizations loc) async {
     await flutterLocalNotificationsPlugin.cancelAll(); // Cancel old schedules
     await requestPermissions(); // Request permission before scheduling
 
-    final List<Map<String, String>> morningNotifs = [
-      {'title': loc.notif1Title, 'body': loc.notif1Body},
-      {'title': loc.notif2Title, 'body': loc.notif2Body},
-      {'title': loc.notif3Title, 'body': loc.notif3Body},
-      {'title': loc.notif4Title, 'body': loc.notif4Body},
-      {'title': loc.notif5Title, 'body': loc.notif5Body},
-      {'title': loc.notif6Title, 'body': loc.notif6Body},
-      {'title': loc.notif7Title, 'body': loc.notif7Body},
-    ];
+    // --- NEW --- Load data for personalized notifications
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('username') ?? 'User';
+    final balance = prefs.getDouble('balance') ?? 0;
+    final currency = prefs.getString('currency') ?? '';
+    final json = prefs.getString('transactions') ?? '[]';
+    final transactions =
+        (jsonDecode(json) as List)
+            .map((e) => Transaction.fromJson(e as Map<String, dynamic>))
+            .toList();
 
-    final List<Map<String, String>> eveningNotifs = [
-      {'title': loc.notif8Title, 'body': loc.notif8Body},
-      {'title': loc.notif9Title, 'body': loc.notif9Body},
-      {'title': loc.notif10Title, 'body': loc.notif10Body},
-      {'title': loc.notif11Title, 'body': loc.notif11Body},
-      {'title': loc.notif12Title, 'body': loc.notif12Body},
-      {'title': loc.notif13Title, 'body': loc.notif13Body},
-      {'title': loc.notif14Title, 'body': loc.notif14Body},
-    ];
+    // Calculate today's stats
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
 
+    final todaysTransactions = transactions.where(
+      (t) => t.date.isAfter(startOfDay) && t.date.isBefore(endOfDay),
+    );
+
+    final double todayIncome = todaysTransactions
+        .where((t) => t.amount > 0)
+        .fold(0, (a, b) => a + b.amount);
+
+    final double todayExpense = todaysTransactions
+        .where((t) => t.amount < 0)
+        .fold(0, (a, b) => a + b.amount.abs());
+
+    // Format for display
+    final String fBalance = formatCurrencyCompact(balance, currency);
+    final String fIncome = formatCurrencyCompact(todayIncome, currency);
+    final String fExpense = formatCurrencyCompact(todayExpense, currency);
+
+    // Get random messages
     final random = math.Random();
 
-    // Choose randomized messages
+    // 1. Morning Notifications (Generic)
+    final morningNotifs = [
+      {
+        'title': loc.notifMorningTitle1(username),
+        'body': loc.notifMorningBody1,
+      },
+      {
+        'title': loc.notifMorningTitle2(username),
+        'body': loc.notifMorningBody2,
+      },
+    ];
+
+    // 2. Midday Notifications (Generic)
+    final middayNotifs = [
+      {'title': loc.notifMiddayTitle1(username), 'body': loc.notifMiddayBody1},
+      {'title': loc.notifMiddayTitle2(username), 'body': loc.notifMiddayBody2},
+    ];
+
+    // 3. Afternoon Notifications (Generic)
+    final afternoonNotifs = [
+      {
+        'title': loc.notifAfternoonTitle1(username),
+        'body': loc.notifAfternoonBody1,
+      },
+      {
+        'title': loc.notifAfternoonTitle2(username),
+        'body': loc.notifAfternoonBody2,
+      },
+    ];
+
+    // 4. Evening Notifications (Data-driven)
+    final String eveningTitle = loc.notifEveningTitle(username);
+    final String eveningBody =
+        (todayIncome == 0 && todayExpense == 0)
+            ? loc.notifEveningBodyNoActivity(fBalance)
+            : loc.notifEveningBodySummary(fIncome, fExpense, fBalance);
+
+    // 5. Night Notifications (Data-driven)
+    final String nightTitle = loc.notifNightTitle(username);
+    final String nightBody =
+        (todayIncome == 0 && todayExpense == 0)
+            ? loc.notifNightBodyNoActivity
+            : loc.notifNightBodySummary(fIncome, fExpense);
+
     final morningChoice = morningNotifs[random.nextInt(morningNotifs.length)];
-    final eveningChoice = eveningNotifs[random.nextInt(eveningNotifs.length)];
+    final middayChoice = middayNotifs[random.nextInt(middayNotifs.length)];
+    final afternoonChoice =
+        afternoonNotifs[random.nextInt(afternoonNotifs.length)];
 
     // Android-specific channel details
-    const AndroidNotificationDetails
-    androidDetails = AndroidNotificationDetails(
-      channelId,
-      channelName,
-      channelDescription: channelDescription,
-      importance: Importance.max,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher', // Use the icon you set up in AndroidManifest
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          styleInformation: BigTextStyleInformation(
+            '',
+          ), // Allow multi-line text
+        );
 
     const NotificationDetails platformChannelDetails = NotificationDetails(
       android: androidDetails,
     );
 
-    // 1. Schedule Morning Notification (~9:00 AM)
+    // Schedule 1. Morning (~9:00 AM)
     await flutterLocalNotificationsPlugin.zonedSchedule(
-      morningNotificationId, // ID
+      morningNotificationId,
       morningChoice['title'],
       morningChoice['body'],
-      _nextInstanceOfTime(9, 0), // Next 9:00 AM in user's timezone
+      _nextInstanceOfTime(9, 0), // 9:00 AM
       platformChannelDetails,
-      androidScheduleMode:
-          AndroidScheduleMode.exactAllowWhileIdle, // Fire even in Doze mode
-      matchDateTimeComponents:
-          DateTimeComponents.time, // Repeat daily at 9:00 AM
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    // 2. Schedule Evening Notification (~8:00 PM)
+    // Schedule 2. Midday (~1:00 PM)
     await flutterLocalNotificationsPlugin.zonedSchedule(
-      eveningNotificationId, // ID
-      eveningChoice['title'],
-      eveningChoice['body'],
-      _nextInstanceOfTime(20, 00), // Next 8:00 PM (20:00) in user's timezone
-
+      middayNotificationId,
+      middayChoice['title'],
+      middayChoice['body'],
+      _nextInstanceOfTime(13, 0), // 1:00 PM
       platformChannelDetails,
-      androidScheduleMode:
-          AndroidScheduleMode.exactAllowWhileIdle, // Fire even in Doze mode
-      matchDateTimeComponents:
-          DateTimeComponents.time, // Repeat daily at 8:00 PM
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    debugPrint(
-      "Scheduled notifications in ${loc.locale.languageCode}: Morning & Evening",
+    // Schedule 3. Afternoon (~5:00 PM)
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      afternoonNotificationId,
+      afternoonChoice['title'],
+      afternoonChoice['body'],
+      _nextInstanceOfTime(17, 0), // 5:00 PM
+      platformChannelDetails,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
+
+    // Schedule 4. Evening (~8:00 PM)
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      eveningNotificationId,
+      eveningTitle,
+      eveningBody,
+      _nextInstanceOfTime(20, 0), // 8:00 PM
+      platformChannelDetails,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+
+    // Schedule 5. Night (~10:00 PM)
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      nightNotificationId,
+      nightTitle,
+      nightBody,
+      _nextInstanceOfTime(22, 0), // 10:00 PM
+      platformChannelDetails,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+
+    debugPrint("Scheduled 5 daily notifications in ${loc.locale.languageCode}");
   }
 }
 
@@ -181,14 +276,60 @@ Future<void> main() async {
 // ... (AppColors remains unchanged)
 /* --------------------------------------------------------------------- */
 class AppColors {
-  static const Color primary = Color(0xFF0A7E8C); // Deep Teal
-  static const Color accent = Color(0xFFFF6B35); // Vibrant Orange
+  static const Color primary = Color(0xFF4CB8A9); // Soft Modern Teal
+  static const Color accent = Color(0xFFFF6B35); // Vibrant Orange (good)
   static const Color lightBg = Color(0xFFF5F7FA);
   static const Color darkBg = Color(0xFF0D1B2A);
   static const Color cardLight = Colors.white;
   static const Color cardDark = Color(0xFF1B263B);
   static const Color positive = Color(0xFF4CAF50);
   static const Color negative = Color(0xFFF44336);
+}
+
+// ---------------------------------------------------------------------
+// NEW CATEGORY DEFINITIONS
+// ---------------------------------------------------------------------
+class AppCategories {
+  // Define category keys and their corresponding icons
+  static const Map<String, IconData> categories = {
+    'salary': Icons.work_outline,
+    'gifts': Icons.card_giftcard,
+    'food': Icons.fastfood_outlined,
+    'transport': Icons.directions_bus_outlined,
+    'entertainment': Icons.movie_creation_outlined,
+    'shopping': Icons.shopping_bag_outlined,
+    'health': Icons.local_hospital_outlined,
+    'bills': Icons.receipt_long_outlined,
+    'other': Icons.category_outlined,
+  };
+
+  // --- NEW ---
+  // Define category keys and their corresponding colors for charts
+  static const Map<String, Color> categoryColors = {
+    'salary': Color(0xFF4CAF50), // positive
+    'gifts': Color(0xFF009688), // teal
+    'food': Color(0xFFFF9800), // orange
+    'transport': Color(0xFF2196F3), // blue
+    'entertainment': Color(0xFF9C27B0), // purple
+    'shopping': Color(0xFFE91E63), // pink
+    'health': Color(0xFFF44336), // negative
+    'bills': Color(0xFF3F51B5), // indigo
+    'other': Color(0xFF9E9E9E), // grey
+  };
+
+  // Helper to get an icon for a category key, defaulting to 'other'
+  static IconData getIcon(String? categoryKey) {
+    return categories[categoryKey] ?? categories['other']!;
+  }
+
+  // --- NEW ---
+  // Helper to get a color for a category key, defaulting to 'other'
+  static Color getColor(String? categoryKey) {
+    return categoryColors[categoryKey] ?? categoryColors['other']!;
+  }
+
+  // Helper to get all category keys
+  static List<String> get keys => categories.keys.toList();
 }
 
 /* --------------------------------------------------------------------- */
@@ -209,6 +350,7 @@ class AppLocalizations {
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
+  // --- MODIFIED --- (Reworked all notification strings)
   static const Map<String, Map<String, String>> _localizedValues = {
     'en': {
       'selectLang': 'Select Language',
@@ -249,36 +391,46 @@ class AppLocalizations {
       'month': 'Month',
       'year': 'Year',
       'language': 'Language',
-      // --- NOTIFICATION STRINGS ---
-      'notif1Title': 'Start your cash flow strong 💪',
-      'notif1Body': 'Add your first transaction and stay ahead today.',
-      'notif2Title': 'Good morning, money mover ☀️',
-      'notif2Body': 'Log what’s coming in — small wins build big stacks.',
-      'notif3Title': 'Every dirham counts 💸',
-      'notif3Body': 'Record your spending now before it disappears.',
-      'notif4Title': 'New day, same goal: grow your wallet',
-      'notif4Body': 'Open CashInOut and add today’s moves.',
-      'notif5Title': 'Don’t let your money wander',
-      'notif5Body': 'Track it before it forgets who owns it.',
-      'notif6Title': 'Tap in before you cash out',
-      'notif6Body': 'Quick log = clear mind. Let’s do this.',
-      'notif7Title': 'Your budget’s waiting ⏱️',
-      'notif7Body': 'Update your numbers and rule your finances today.',
-      'notif8Title': 'Your wallet told me it’s tired',
-      'notif8Body': 'Review your spending before tomorrow surprises you.',
-      'notif9Title': 'End strong, saver 🧾',
-      'notif9Body': 'Check today’s totals — progress happens nightly.',
-      'notif10Title': 'You vs. yesterday',
-      'notif10Body': 'Spent less? Spent more? Tap to see your stats.',
-      'notif11Title': 'Dinner cost hit hard? 🍕',
-      'notif11Body': 'Update your spending and face the truth gently.',
-      'notif12Title': 'Track. Reflect. Chill.',
-      'notif12Body': 'A minute here saves confusion later.',
-      'notif13Title': 'Your cash day is closing',
-      'notif13Body': 'Let’s log the final numbers — no loose ends.',
-      'notif14Title': 'Daily balance check ✅',
-      'notif14Body':
-          'Tap to see what your wallet did while you weren’t looking.',
+      'description': 'Description (Optional)',
+      'category': 'Category',
+      'food': 'Food',
+      'transport': 'Transport',
+      'entertainment': 'Entertainment',
+      'shopping': 'Shopping',
+      'health': 'Health',
+      'bills': 'Bills',
+      'salary': 'Salary',
+      'gifts': 'Gifts',
+      'other': 'Other',
+      // --- NEW NOTIFICATION STRINGS ---
+      'notifMorningTitle1': 'Good morning, {username}! ☀️',
+      'notifMorningBody1':
+          'Ready to conquer your finances? Start by logging today\'s first move.',
+      'notifMorningTitle2': 'Rise and shine, {username}!',
+      'notifMorningBody2':
+          'A new day to grow your wallet. Open CashInOut and stay on top.',
+      'notifMiddayTitle1': 'Lunchtime check-in, {username}!',
+      'notifMiddayBody1':
+          'Grabbed a bite? Take 10 seconds to log it. Your future self will thank you.',
+      'notifMiddayTitle2': 'Hey {username}, how\'s your day?',
+      'notifMiddayBody2':
+          'Don\'t let expenses slip by. A quick log keeps your balance accurate.',
+      'notifAfternoonTitle1': 'Afternoon update, {username} ☕',
+      'notifAfternoonBody1':
+          'Heading home soon? Log that transport cost or afternoon coffee!',
+      'notifAfternoonTitle2': 'Quick reminder, {username}!',
+      'notifAfternoonBody2':
+          'Keep the momentum going. Add any new transactions to see your progress.',
+      'notifEveningTitle': 'Your Daily Report, {username} 📊',
+      'notifEveningBodySummary':
+          'Today: +{income} | -{expense}. Your new balance is {balance}. Great job!',
+      'notifEveningBodyNoActivity':
+          'No new transactions logged today. Your balance is {balance}. Don\'t forget to update!',
+      'notifNightTitle': 'Wrapping up, {username}? 🌙',
+      'notifNightBodySummary':
+          'You rocked it today with +{income} earned and -{expense} managed. Sleep well!',
+      'notifNightBodyNoActivity':
+          'One last check... any final expenses to log before bed? Keep your records perfect!',
     },
     'fr': {
       'selectLang': 'Sélectionner la langue',
@@ -305,7 +457,7 @@ class AppLocalizations {
       'changeCurrency': 'Changer la devise',
       'resetData': 'Réinitialiser',
       'developer': 'Développeur',
-      'builtWithLove': 'Cette application a été créée avec amour et passion',
+      'builtWithLove': 'Cette application a été créée with amour et passion',
       'website': 'Site web',
       'github': 'GitHub',
       'addIncome': 'Ajouter un revenu',
@@ -319,47 +471,46 @@ class AppLocalizations {
       'month': 'Mois',
       'year': 'Année',
       'language': 'Langue',
-      // --- NOTIFICATION STRINGS ---
-      'notif1Title': 'Commencez fort votre flux de trésorerie 💪',
-      'notif1Body':
-          'Ajoutez votre première transaction pour rester en tête aujourd\'hui.',
-      'notif2Title': 'Bonjour, gestionnaire d\'argent ☀️',
-      'notif2Body':
-          'Enregistrez vos revenus — les petites victoires font les grandes réussites.',
-      'notif3Title': 'Chaque dirham compte 💸',
-      'notif3Body':
-          'Enregistrez vos dépenses maintenant avant qu\'elles ne disparaissent.',
-      'notif4Title':
-          'Nouveau jour, même objectif : faites grandir votre portefeuille',
-      'notif4Body':
-          'Ouvrez CashInOut et ajoutez les mouvements d\'aujourd\'hui.',
-      'notif5Title': 'Ne laissez pas votre argent s\'égarer',
-      'notif5Body': 'Suivez-le avant qu\'il n\'oublie à qui il appartient.',
-      'notif6Title': 'Enregistrez avant de dépenser',
-      'notif6Body': 'Un enregistrement rapide = un esprit clair. C\'est parti.',
-      'notif7Title': 'Votre budget vous attend ⏱️',
-      'notif7Body':
-          'Mettez à jour vos chiffres et maîtrisez vos finances aujourd\'hui.',
-      'notif8Title': 'Votre portefeuille m\'a dit qu\'il est fatigué',
-      'notif8Body':
-          'Passez en revue vos dépenses avant que demain ne vous surprenne.',
-      'notif9Title': 'Terminez en force, épargnant 🧾',
-      'notif9Body':
-          'Vérifiez les totaux du jour — les progrès se font chaque nuit.',
-      'notif10Title': 'Vous contre hier',
-      'notif10Body':
-          'Moins dépensé ? Plus dépensé ? Touchez pour voir vos stats.',
-      'notif11Title': 'Le dîner a coûté cher ? 🍕',
-      'notif11Body':
-          'Mettez à jour vos dépenses et affrontez la vérité en douceur.',
-      'notif12Title': 'Suivre. Réfléchir. Détendez-vous.',
-      'notif12Body': 'Une minute ici vous évite la confusion plus tard.',
-      'notif13Title': 'Votre journée d\'argent se termine',
-      'notif13Body':
-          'Enregistrons les derniers chiffres — pas de détails oubliés.',
-      'notif14Title': 'Vérification quotidienne du solde ✅',
-      'notif14Body':
-          'Touchez pour voir ce que votre portefeuille a fait à votre insu.',
+      'description': 'Description (Optionnel)',
+      'category': 'Catégorie',
+      'food': 'Nourriture',
+      'transport': 'Transport',
+      'entertainment': 'Divertissement',
+      'shopping': 'Achats',
+      'health': 'Santé',
+      'bills': 'Factures',
+      'salary': 'Salaire',
+      'gifts': 'Cadeaux',
+      'other': 'Autre',
+      // --- NEW NOTIFICATION STRINGS ---
+      'notifMorningTitle1': 'Bonjour, {username} ! ☀️',
+      'notifMorningBody1':
+          'Prêt à maîtriser vos finances ? Commencez par noter votre premier mouvement du jour.',
+      'notifMorningTitle2': 'Debout, {username} !',
+      'notifMorningBody2':
+          'Un nouveau jour pour faire grandir votre portefeuille. Ouvrez CashInOut et gardez le contrôle.',
+      'notifMiddayTitle1': 'Point du midi, {username} !',
+      'notifMiddayBody1':
+          'Un petit creux ? Prenez 10 secondes pour l\'enregistrer. Votre futur vous remerciera.',
+      'notifMiddayTitle2': 'Salut {username}, comment ça va ?',
+      'notifMiddayBody2':
+          'Ne laissez pas les dépenses s\'accumuler. Un enregistrement rapide garantit un solde précis.',
+      'notifAfternoonTitle1': 'Mise à jour de l\'après-midi, {username} ☕',
+      'notifAfternoonBody1':
+          'Bientôt la fin ? Notez ces frais de transport ou ce café !',
+      'notifAfternoonTitle2': 'Petit rappel, {username} !',
+      'notifAfternoonBody2':
+          'Continuez sur votre lancée. Ajoutez vos nouvelles transactions pour voir vos progrès.',
+      'notifEveningTitle': 'Votre rapport du jour, {username} 📊',
+      'notifEveningBodySummary':
+          'Aujourd\'hui : +{income} | -{expense}. Votre nouveau solde est de {balance}. Bravo !',
+      'notifEveningBodyNoActivity':
+          'Aucune transaction enregistrée aujourd\'hui. Votre solde est de {balance}. Pensez à mettre à jour !',
+      'notifNightTitle': 'C\'est la fin, {username} ? 🌙',
+      'notifNightBodySummary':
+          'Vous avez assuré aujourd\'hui avec +{income} gagnés et -{expense} gérés. Dormez bien !',
+      'notifNightBodyNoActivity':
+          'Une dernière vérification... des dépenses finales à noter avant de dormir ? Gardez des comptes parfaits !',
     },
     'ar': {
       'selectLang': 'اختر اللغة',
@@ -388,7 +539,7 @@ class AppLocalizations {
       'developer': 'المطور',
       'builtWithLove': 'تم تطوير هذا التطبيق بحب وشغف',
       'website': 'الموقع الإلكتروني',
-      'github': 'جيت هب',
+      'github': 'GitHub',
       'addIncome': 'إضافة دخل',
       'addExpense': 'إضافة مصروف',
       'amount': 'المبلغ',
@@ -400,35 +551,45 @@ class AppLocalizations {
       'month': 'شهر',
       'year': 'سنة',
       'language': 'اللغة',
-      // --- NOTIFICATION STRINGS ---
-      'notif1Title': 'ابدأ تدفقك المالي بقوة 💪',
-      'notif1Body': 'أضف أول معاملة لك وابقَ متقدماً اليوم.',
-      'notif2Title': 'صباح الخير، يا محرك المال ☀️',
-      'notif2Body': 'سجل ما يدخل - الإنجازات الصغيرة تبني أرصدة كبيرة.',
-      'notif3Title': 'كل درهم مهم 💸',
-      'notif3Body': 'سجل مصروفاتك الآن قبل أن تختفي.',
-      'notif4Title': 'يوم جديد، نفس الهدف: تنمية محفظتك',
-      'notif4Body': 'افتح CashInOut وأضف تحركات اليوم.',
-      'notif5Title': 'لا تدع أموالك تتجول',
-      'notif5Body': 'تتبعها قبل أن تنسى من يملكها.',
-      'notif6Title': 'سجل قبل أن تصرف',
-      'notif6Body': 'تسجيل سريع = ذهن صافي. لنفعلها.',
-      'notif7Title': 'ميزانيتك تنتظرك ⏱️',
-      'notif7Body': 'حدث أرقامك وتحكم في أموالك اليوم.',
-      'notif8Title': 'محفظتك أخبرتني أنها متعبة',
-      'notif8Body': 'راجع إنفاقك قبل أن يفاجئك الغد.',
-      'notif9Title': 'اختتم بقوة، يا مدخر 🧾',
-      'notif9Body': 'تحقق من إجمالي اليوم - التقدم يحدث ليلاً.',
-      'notif10Title': 'أنت مقابل الأمس',
-      'notif10Body': 'أنفقت أقل؟ أنفقت أكثر؟ اضغط لترى إحصائياتك.',
-      'notif11Title': 'هل أثرت تكلفة العشاء بشدة؟ 🍕',
-      'notif11Body': 'حدث إنفاقك وواجه الحقيقة بلطف.',
-      'notif12Title': 'تتبع. فكر. استرخ.',
-      'notif12Body': 'دقيقة هنا توفر عليك الارتباك لاحقاً.',
-      'notif13Title': 'يومك المالي يقترب من النهاية',
-      'notif13Body': 'لنسجل الأرقام النهائية - لا نترك أي شيء ناقصاً.',
-      'notif14Title': 'تحقق من الرصيد اليومي ✅',
-      'notif14Body': 'اضغط لترى ما فعلته محفظتك وأنت لا تنظر.',
+      'description': 'الوصف (اختياري)',
+      'category': 'الفئة',
+      'food': 'طعام',
+      'transport': 'مواصلات',
+      'entertainment': 'ترفيه',
+      'shopping': 'تسوق',
+      'health': 'صحة',
+      'bills': 'فواتير',
+      'salary': 'راتب',
+      'gifts': 'هدايا',
+      'other': 'أخرى',
+      // --- NEW NOTIFICATION STRINGS ---
+      'notifMorningTitle1': 'صباح الخير، {username}! ☀️',
+      'notifMorningBody1':
+          'مستعد للسيطرة على أموالك؟ ابدأ بتسجيل أول حركة مالية اليوم.',
+      'notifMorningTitle2': 'صباح النجاح، {username}!',
+      'notifMorningBody2':
+          'يوم جديد لتنمية محفظتك. افتح CashInOut وابقَ متحكماً.',
+      'notifMiddayTitle1': 'تفقّد الظهيرة، {username}!',
+      'notifMiddayBody1':
+          'هل تناولت الغداء؟ خذ 10 ثوانٍ لتسجيله. مستقبلك سيشكرك.',
+      'notifMiddayTitle2': 'مرحباً {username}، كيف يومك؟',
+      'notifMiddayBody2':
+          'لا تدع المصاريف تفلت منك. تسجيل سريع يحافظ على دقة رصيدك.',
+      'notifAfternoonTitle1': 'تحديث المساء، {username} ☕',
+      'notifAfternoonBody1':
+          'هل أنت في طريقك للمنزل؟ سجل تكلفة المواصلات أو قهوة العصر!',
+      'notifAfternoonTitle2': 'تذكير سريع، {username}!',
+      'notifAfternoonBody2': 'حافظ على حماسك. أضف أي معاملات جديدة لترى تقدمك.',
+      'notifEveningTitle': 'تقريرك اليومي، {username} 📊',
+      'notifEveningBodySummary':
+          'اليوم: +{income} | -{expense}. رصيدك الجديد {balance}. أحسنت صنعاً!',
+      'notifEveningBodyNoActivity':
+          'لم يتم تسجيل معاملات جديدة اليوم. رصيدك {balance}. لا تنس التحديث!',
+      'notifNightTitle': 'تستعد للنوم، {username}؟ 🌙',
+      'notifNightBodySummary':
+          'لقد أبدعت اليوم بدخل +{income} وإدارة -{expense}. نوماً هنيئاً!',
+      'notifNightBodyNoActivity':
+          'تحقق أخير... هل هناك أي مصاريف أخيرة لتسجيلها قبل النوم؟ حافظ على سجلاتك مثالية!',
     },
   };
 
@@ -481,63 +642,118 @@ class AppLocalizations {
   String get year => _localizedValues[locale.languageCode]!['year']!;
   String get language => _localizedValues[locale.languageCode]!['language']!;
 
-  // Notification Getters
-  String get notif1Title =>
-      _localizedValues[locale.languageCode]!['notif1Title']!;
-  String get notif1Body =>
-      _localizedValues[locale.languageCode]!['notif1Body']!;
-  String get notif2Title =>
-      _localizedValues[locale.languageCode]!['notif2Title']!;
-  String get notif2Body =>
-      _localizedValues[locale.languageCode]!['notif2Body']!;
-  String get notif3Title =>
-      _localizedValues[locale.languageCode]!['notif3Title']!;
-  String get notif3Body =>
-      _localizedValues[locale.languageCode]!['notif3Body']!;
-  String get notif4Title =>
-      _localizedValues[locale.languageCode]!['notif4Title']!;
-  String get notif4Body =>
-      _localizedValues[locale.languageCode]!['notif4Body']!;
-  String get notif5Title =>
-      _localizedValues[locale.languageCode]!['notif5Title']!;
-  String get notif5Body =>
-      _localizedValues[locale.languageCode]!['notif5Body']!;
-  String get notif6Title =>
-      _localizedValues[locale.languageCode]!['notif6Title']!;
-  String get notif6Body =>
-      _localizedValues[locale.languageCode]!['notif6Body']!;
-  String get notif7Title =>
-      _localizedValues[locale.languageCode]!['notif7Title']!;
-  String get notif7Body =>
-      _localizedValues[locale.languageCode]!['notif7Body']!;
-  String get notif8Title =>
-      _localizedValues[locale.languageCode]!['notif8Title']!;
-  String get notif8Body =>
-      _localizedValues[locale.languageCode]!['notif8Body']!;
-  String get notif9Title =>
-      _localizedValues[locale.languageCode]!['notif9Title']!;
-  String get notif9Body =>
-      _localizedValues[locale.languageCode]!['notif9Body']!;
-  String get notif10Title =>
-      _localizedValues[locale.languageCode]!['notif10Title']!;
-  String get notif10Body =>
-      _localizedValues[locale.languageCode]!['notif10Body']!;
-  String get notif11Title =>
-      _localizedValues[locale.languageCode]!['notif11Title']!;
-  String get notif11Body =>
-      _localizedValues[locale.languageCode]!['notif11Body']!;
-  String get notif12Title =>
-      _localizedValues[locale.languageCode]!['notif12Title']!;
-  String get notif12Body =>
-      _localizedValues[locale.languageCode]!['notif12Body']!;
-  String get notif13Title =>
-      _localizedValues[locale.languageCode]!['notif13Title']!;
-  String get notif13Body =>
-      _localizedValues[locale.languageCode]!['notif13Body']!;
-  String get notif14Title =>
-      _localizedValues[locale.languageCode]!['notif14Title']!;
-  String get notif14Body =>
-      _localizedValues[locale.languageCode]!['notif14Body']!;
+  // --- NEW CATEGORY & DESCRIPTION GETTERS ---
+  String get description =>
+      _localizedValues[locale.languageCode]!['description']!;
+  String get category => _localizedValues[locale.languageCode]!['category']!;
+  String get food => _localizedValues[locale.languageCode]!['food']!;
+  String get transport => _localizedValues[locale.languageCode]!['transport']!;
+  String get entertainment =>
+      _localizedValues[locale.languageCode]!['entertainment']!;
+  String get shopping => _localizedValues[locale.languageCode]!['shopping']!;
+  String get health => _localizedValues[locale.languageCode]!['health']!;
+  String get bills => _localizedValues[locale.languageCode]!['bills']!;
+  String get salary => _localizedValues[locale.languageCode]!['salary']!;
+  String get gifts => _localizedValues[locale.languageCode]!['gifts']!;
+  String get other => _localizedValues[locale.languageCode]!['other']!;
+
+  // --- NEW HELPER ---
+  // Helper to get the localized display name for a category key
+  String getCategoryDisplayName(String? key) {
+    switch (key) {
+      case 'food':
+        return food;
+      case 'transport':
+        return transport;
+      case 'entertainment':
+        return entertainment;
+      case 'shopping':
+        return shopping;
+      case 'health':
+        return health;
+      case 'bills':
+        return bills;
+      case 'salary':
+        return salary;
+      case 'gifts':
+        return gifts;
+      case 'other':
+        return other;
+      default:
+        return other;
+    }
+  }
+
+  // --- MODIFIED --- (New notification string getters)
+  String notifMorningTitle1(String username) =>
+      _localizedValues[locale.languageCode]!['notifMorningTitle1']!.replaceAll(
+        '{username}',
+        username,
+      );
+  String get notifMorningBody1 =>
+      _localizedValues[locale.languageCode]!['notifMorningBody1']!;
+  String notifMorningTitle2(String username) =>
+      _localizedValues[locale.languageCode]!['notifMorningTitle2']!.replaceAll(
+        '{username}',
+        username,
+      );
+  String get notifMorningBody2 =>
+      _localizedValues[locale.languageCode]!['notifMorningBody2']!;
+
+  String notifMiddayTitle1(String username) =>
+      _localizedValues[locale.languageCode]!['notifMiddayTitle1']!.replaceAll(
+        '{username}',
+        username,
+      );
+  String get notifMiddayBody1 =>
+      _localizedValues[locale.languageCode]!['notifMiddayBody1']!;
+  String notifMiddayTitle2(String username) =>
+      _localizedValues[locale.languageCode]!['notifMiddayTitle2']!.replaceAll(
+        '{username}',
+        username,
+      );
+  String get notifMiddayBody2 =>
+      _localizedValues[locale.languageCode]!['notifMiddayBody2']!;
+
+  String notifAfternoonTitle1(String username) =>
+      _localizedValues[locale.languageCode]!['notifAfternoonTitle1']!
+          .replaceAll('{username}', username);
+  String get notifAfternoonBody1 =>
+      _localizedValues[locale.languageCode]!['notifAfternoonBody1']!;
+  String notifAfternoonTitle2(String username) =>
+      _localizedValues[locale.languageCode]!['notifAfternoonTitle2']!
+          .replaceAll('{username}', username);
+  String get notifAfternoonBody2 =>
+      _localizedValues[locale.languageCode]!['notifAfternoonBody2']!;
+
+  String notifEveningTitle(String username) =>
+      _localizedValues[locale.languageCode]!['notifEveningTitle']!.replaceAll(
+        '{username}',
+        username,
+      );
+  String notifEveningBodySummary(
+    String income,
+    String expense,
+    String balance,
+  ) => _localizedValues[locale.languageCode]!['notifEveningBodySummary']!
+      .replaceAll('{income}', income)
+      .replaceAll('{expense}', expense)
+      .replaceAll('{balance}', balance);
+  String notifEveningBodyNoActivity(String balance) =>
+      _localizedValues[locale.languageCode]!['notifEveningBodyNoActivity']!
+          .replaceAll('{balance}', balance);
+
+  String notifNightTitle(String username) =>
+      _localizedValues[locale.languageCode]!['notifNightTitle']!.replaceAll(
+        '{username}',
+        username,
+      );
+  String notifNightBodySummary(String income, String expense) =>
+      _localizedValues[locale.languageCode]!['notifNightBodySummary']!
+          .replaceAll('{income}', income)
+          .replaceAll('{expense}', expense);
+  String get notifNightBodyNoActivity =>
+      _localizedValues[locale.languageCode]!['notifNightBodyNoActivity']!;
 }
 
 class _AppLocalizationsDelegate
@@ -562,6 +778,13 @@ class _AppLocalizationsDelegate
 /* --------------------------------------------------------------------- */
 String formatCurrency(double amount, String currency) => intl_fmt
     .NumberFormat.currency(symbol: currency, decimalDigits: 2).format(amount);
+
+// --- NEW --- (Compact formatter for large numbers)
+String formatCurrencyCompact(double amount, String currency) =>
+    intl_fmt.NumberFormat.compactCurrency(
+      symbol: currency,
+      decimalDigits: 2,
+    ).format(amount);
 
 /* --------------------------------------------------------------------- */
 /* MAIN APP                                                             */
@@ -621,7 +844,7 @@ class MainAppState extends State<MainApp> {
       if (navContext != null) {
         try {
           final loc = AppLocalizations.of(navContext);
-          // The service now handles localization based on the context's locale
+          // --- MODIFIED --- (Service now handles all data loading)
           _notificationService.scheduleDailyNotifications(loc);
         } catch (e) {
           // In case Localizations are still not ready, fallback to the stored locale
@@ -653,6 +876,7 @@ class MainAppState extends State<MainApp> {
       try {
         final loc =
             ctx != null ? AppLocalizations.of(ctx) : AppLocalizations(_locale);
+        // --- MODIFIED --- (Service now handles all data loading)
         await _notificationService.scheduleDailyNotifications(loc);
       } catch (e) {
         debugPrint('Failed to schedule notifications: $e');
@@ -728,11 +952,11 @@ class MainAppState extends State<MainApp> {
       cardColor: AppColors.cardLight,
       fontFamily:
           isArabic
-              ? GoogleFonts.cairo().fontFamily
+              ? GoogleFonts.zain().fontFamily
               : GoogleFonts.poppins().fontFamily,
       textTheme:
           isArabic
-              ? GoogleFonts.cairoTextTheme()
+              ? GoogleFonts.zainTextTheme()
               : GoogleFonts.poppinsTextTheme(),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -896,6 +1120,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
           amount: initialBalance,
           date: DateTime.now(),
           balanceAfter: initialBalance,
+          category: 'other', // --- MODIFIED ---
+          description: 'Starting Balance', // --- MODIFIED ---
         ),
       );
     }
@@ -1046,11 +1272,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
 /* --------------------------------------------------------------------- */
 /* 2. HOME PAGE                                                         */
 /* --------------------------------------------------------------------- */
-class ChartData {
-  final List<FlSpot> spots;
-  final List<DateTime> periods;
 
-  ChartData(this.spots, this.periods);
+// --- MODIFIED --- (Removed old ChartData class)
+// --- NEW --- (Data model for Syncfusion line chart)
+class SalesData {
+  SalesData(this.date, this.net);
+  final DateTime date;
+  final double net;
 }
 
 class HomePage extends StatefulWidget {
@@ -1069,12 +1297,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Future<void> _initFuture;
   late AnimationController _fabController;
 
+  // --- NEW --- (Tooltip behavior for Syncfusion chart)
+  late TooltipBehavior _tooltipBehavior;
+
   @override
   void initState() {
     super.initState();
     _fabController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
+    );
+    // --- NEW ---
+    _tooltipBehavior = TooltipBehavior(
+      enable: true,
+      // Format the tooltip
+      builder: (
+        dynamic data,
+        dynamic point,
+        dynamic series,
+        int pointIndex,
+        int seriesIndex,
+      ) {
+        final SalesData salesData = data as SalesData;
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 5),
+            ],
+          ),
+          child: Text(
+            // --- MODIFIED --- (Use regular formatCurrency for tooltips)
+            '${intl_fmt.DateFormat('MMM d').format(salesData.date)}: ${formatCurrency(salesData.net, currency!)}',
+            style: TextStyle(
+              color:
+                  salesData.net >= 0 ? AppColors.positive : AppColors.negative,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      },
     );
     _initFuture = _loadAll();
   }
@@ -1132,10 +1396,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return nets;
   }
 
-  ChartData _getChartData() {
+  // --- MODIFIED --- (Changed to return List<SalesData> for Syncfusion)
+  List<SalesData> _getChartData() {
     final now = DateTime.now();
     final nets = _getNets(period);
-
     DateTime startDate;
 
     if (period == ChartPeriod.week) {
@@ -1147,10 +1411,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (period == ChartPeriod.month) {
       startDate = DateTime(now.year, now.month, 1);
     } else {
+      // Year
       startDate = DateTime(now.year, now.month - 11, 1);
     }
 
     final List<DateTime> relevantPeriods = [];
+    final List<SalesData> chartData = [];
 
     if (period == ChartPeriod.year) {
       for (int i = 0; i < 12; i++) {
@@ -1171,37 +1437,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     }
 
-    List<FlSpot> spots = [];
-    List<DateTime> periodsWithData = [];
-
+    // Populate chartData with net values for each period
     for (final p in relevantPeriods) {
       final net = nets[p] ?? 0.0;
-      if (net != 0.0) {
-        spots.add(FlSpot(periodsWithData.length.toDouble(), net));
-        periodsWithData.add(p);
-      }
+      chartData.add(SalesData(p, net));
     }
 
-    if (spots.isEmpty) {
-      spots.add(const FlSpot(0, 0));
-      periodsWithData.add(DateTime.now());
+    // Handle empty case
+    if (chartData.isEmpty) {
+      chartData.add(SalesData(DateTime.now(), 0));
     }
 
-    return ChartData(spots, periodsWithData);
+    return chartData;
   }
 
-  List<LineTooltipItem?> _getTooltipItems(List<LineBarSpot> touchedSpots) {
-    return touchedSpots.map((LineBarSpot touchedSpot) {
-      final textStyle = TextStyle(
-        color: touchedSpot.y >= 0 ? AppColors.positive : AppColors.negative,
-        fontWeight: FontWeight.bold,
-      );
-      return LineTooltipItem(
-        formatCurrency(touchedSpot.y, currency ?? ''),
-        textStyle,
-      );
-    }).toList();
-  }
+  // --- MODIFIED --- (Removed _getTooltipItems, Syncfusion handles this)
 
   @override
   Widget build(BuildContext context) {
@@ -1225,7 +1475,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               title: FadeInSlide(
                 child: Text(
                   loc.hey(username!),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               centerTitle: true,
@@ -1323,7 +1576,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                         curve: Curves.easeOutCubic,
                                         builder: (context, value, child) {
                                           return Text(
-                                            formatCurrency(value, currency!),
+                                            // --- MODIFIED --- (Use compact formatter)
+                                            formatCurrencyCompact(
+                                              value,
+                                              currency!,
+                                            ),
                                             style: TextStyle(
                                               fontSize: 32,
                                               fontWeight: FontWeight.bold,
@@ -1371,184 +1628,107 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               padding: const EdgeInsets.all(20),
                               child: SizedBox(
                                 height: 280,
+                                // --- MODIFIED --- (Replaced LineChart with SfCartesianChart)
                                 child: Builder(
                                   builder: (context) {
                                     final chartData = _getChartData();
-                                    var spots = chartData.spots;
 
-                                    double minY = 0;
-                                    double maxY = 0;
-                                    if (spots.isNotEmpty) {
-                                      minY = spots
-                                          .map((s) => s.y)
-                                          .reduce(math.min);
-                                      maxY = spots
-                                          .map((s) => s.y)
-                                          .reduce(math.max);
+                                    // Determine axis intervals
+                                    DateTimeIntervalType intervalType;
+                                    double interval;
+                                    intl_fmt.DateFormat dateFormat;
+
+                                    if (period == ChartPeriod.year) {
+                                      intervalType =
+                                          DateTimeIntervalType.months;
+                                      interval = 1;
+                                      dateFormat = intl_fmt.DateFormat.MMM(
+                                        loc.locale.languageCode,
+                                      );
+                                    } else if (period == ChartPeriod.month) {
+                                      intervalType = DateTimeIntervalType.days;
+                                      interval = 5; // Show a label every 5 days
+                                      dateFormat = intl_fmt.DateFormat.d(
+                                        loc.locale.languageCode,
+                                      );
+                                    } else {
+                                      // Week
+                                      intervalType = DateTimeIntervalType.days;
+                                      interval = 1; // Show a label every day
+                                      dateFormat = intl_fmt.DateFormat.E(
+                                        loc.locale.languageCode,
+                                      );
                                     }
 
-                                    double delta = (maxY - minY) * 0.1;
-                                    if (delta == 0) {
-                                      delta = 10;
-                                    }
-                                    minY = math.min(0, minY - delta);
-                                    maxY = math.max(0, maxY + delta);
-
-                                    final double zeroPercent =
-                                        (0 - minY) / (maxY - minY);
-                                    final cleanZeroPercent = zeroPercent.clamp(
-                                      0.0,
-                                      1.0,
-                                    );
-
-                                    return LineChart(
-                                      LineChartData(
-                                        minY: minY,
-                                        maxY: maxY,
-                                        gridData: FlGridData(
-                                          show: true,
-                                          drawVerticalLine: false,
-                                          getDrawingHorizontalLine:
-                                              (v) => FlLine(
-                                                color: Colors.grey.withAlpha(
-                                                  51,
-                                                ), // FIX: withOpacity(0.2)
-                                                strokeWidth: 1,
-                                              ),
+                                    return SfCartesianChart(
+                                      primaryXAxis: DateTimeAxis(
+                                        intervalType: intervalType,
+                                        interval: interval,
+                                        dateFormat: dateFormat,
+                                        majorGridLines: const MajorGridLines(
+                                          width: 0,
                                         ),
-                                        titlesData: FlTitlesData(
-                                          leftTitles: AxisTitles(
-                                            sideTitles: SideTitles(
-                                              showTitles: true,
-                                              reservedSize: 50,
-                                              getTitlesWidget:
-                                                  (v, m) => Text(
-                                                    v.toStringAsFixed(0),
-                                                    style: GoogleFonts.poppins(
-                                                      fontSize: 12,
-                                                      color:
-                                                          theme
-                                                              .textTheme
-                                                              .bodyMedium!
-                                                              .color,
-                                                    ),
-                                                  ),
-                                            ),
-                                          ),
-                                          bottomTitles: AxisTitles(
-                                            sideTitles: SideTitles(
-                                              showTitles: true,
-                                              interval: 1.0,
-                                              getTitlesWidget: (v, m) {
-                                                final idx = v.toInt();
-
-                                                if (idx < 0 ||
-                                                    idx >=
-                                                        chartData
-                                                            .periods
-                                                            .length) {
-                                                  return const SizedBox();
-                                                }
-
-                                                final d =
-                                                    chartData.periods[idx];
-                                                String label;
-
-                                                if (period ==
-                                                    ChartPeriod.week) {
-                                                  label = intl_fmt.DateFormat(
-                                                    'EEE',
-                                                    loc.locale.languageCode,
-                                                  ).format(d);
-                                                } else if (period ==
-                                                    ChartPeriod.month) {
-                                                  label = d.day.toString();
-                                                } else {
-                                                  // ChartPeriod.year
-                                                  label = intl_fmt.DateFormat(
-                                                    'MMM',
-                                                    loc.locale.languageCode,
-                                                  ).format(d);
-                                                }
-
-                                                return Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        top: 8.0,
-                                                      ),
-                                                  child: Text(
-                                                    label,
-                                                    style:
-                                                        theme
-                                                            .textTheme
-                                                            .labelSmall,
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                          topTitles: const AxisTitles(
-                                            sideTitles: SideTitles(
-                                              showTitles: false,
-                                            ),
-                                          ),
-                                          rightTitles: const AxisTitles(
-                                            sideTitles: SideTitles(
-                                              showTitles: false,
-                                            ),
-                                          ),
+                                        axisLine: const AxisLine(width: 0),
+                                        // --- MODIFIED --- (Rotate labels to prevent overlap)
+                                        labelIntersectAction:
+                                            AxisLabelIntersectAction.rotate45,
+                                      ),
+                                      primaryYAxis: NumericAxis(
+                                        // Use compact format for large numbers
+                                        numberFormat:
+                                            intl_fmt.NumberFormat.compact(),
+                                        axisLine: const AxisLine(width: 0),
+                                        majorTickLines: const MajorTickLines(
+                                          size: 0,
                                         ),
-                                        borderData: FlBorderData(show: false),
-                                        lineTouchData: LineTouchData(
-                                          handleBuiltInTouches: true,
-                                          touchTooltipData:
-                                              LineTouchTooltipData(
-                                                getTooltipColor:
-                                                    (LineBarSpot touchedSpot) =>
-                                                        theme.cardColor
-                                                            .withAlpha(230),
-                                                getTooltipItems:
-                                                    _getTooltipItems,
-                                              ),
-                                        ),
-                                        lineBarsData: [
-                                          LineChartBarData(
-                                            spots: spots,
-                                            isCurved: true,
-                                            barWidth: 3,
-                                            isStrokeCapRound: true,
-                                            dotData: FlDotData(show: false),
-                                            color: AppColors.primary,
-                                            belowBarData: BarAreaData(
-                                              show: true,
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topCenter,
-                                                end: Alignment.bottomCenter,
-                                                colors: [
-                                                  AppColors.positive.withAlpha(
-                                                    77,
-                                                  ), // FIX: withOpacity(0.3)
-                                                  AppColors.positive.withAlpha(
-                                                    77,
-                                                  ), // FIX: withOpacity(0.3)
-                                                  AppColors.negative.withAlpha(
-                                                    77,
-                                                  ), // FIX: withOpacity(0.3)
-                                                  AppColors.negative.withAlpha(
-                                                    77,
-                                                  ), // FIX: withOpacity(0.3)
-                                                ],
-                                                stops: [
-                                                  0.0,
-                                                  cleanZeroPercent,
-                                                  cleanZeroPercent,
-                                                  1.0,
-                                                ],
-                                              ),
-                                            ),
+                                        // Add a plot band to highlight the 0 line
+                                        plotBands: <PlotBand>[
+                                          PlotBand(
+                                            start: 0,
+                                            end: 0,
+                                            borderColor: Colors.grey
+                                                .withOpacity(0.5),
+                                            borderWidth: 1,
                                           ),
                                         ],
                                       ),
+                                      tooltipBehavior: _tooltipBehavior,
+                                      series: <
+                                        CartesianSeries<SalesData, DateTime>
+                                      >[
+                                        SplineAreaSeries<SalesData, DateTime>(
+                                          dataSource: chartData,
+                                          xValueMapper:
+                                              (SalesData sales, _) =>
+                                                  sales.date,
+                                          yValueMapper:
+                                              (SalesData sales, _) => sales.net,
+                                          splineType: SplineType.cardinal,
+                                          // Line color
+                                          borderColor: AppColors.primary,
+                                          borderWidth: 3,
+                                          // Fill gradient
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              AppColors.primary.withOpacity(
+                                                0.4,
+                                              ),
+                                              AppColors.primary.withOpacity(
+                                                0.1,
+                                              ),
+                                              AppColors.negative.withOpacity(
+                                                0.1,
+                                              ),
+                                              AppColors.negative.withOpacity(
+                                                0.4,
+                                              ),
+                                            ],
+                                            stops: [0.0, 0.45, 0.55, 1.0],
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                          ),
+                                        ),
+                                      ],
                                     );
                                   },
                                 ),
@@ -1614,7 +1794,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 ),
                               ),
                               TextButton.icon(
-                                onPressed: _exportCsv,
+                                onPressed:
+                                    () => _exportCsv(loc), // --- MODIFIED ---
                                 icon: const Icon(Icons.share),
                                 label: Text(loc.export),
                               ),
@@ -1651,20 +1832,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                             transactions[transactions.length -
                                                 1 -
                                                 i];
+                                        // --- MODIFIED --- (ListTile layout changed)
+                                        final isPositive = t.amount > 0;
+                                        final color =
+                                            isPositive
+                                                ? AppColors.positive
+                                                : AppColors.negative;
+
                                         return ScaleFadeIn(
                                           delay: i * 0.05,
                                           child: ListTile(
-                                            leading: Icon(
-                                              t.amount > 0
-                                                  ? Icons.trending_up
-                                                  : Icons.trending_down,
-                                              color:
-                                                  t.amount > 0
-                                                      ? AppColors.positive
-                                                      : AppColors.negative,
+                                            leading: CircleAvatar(
+                                              backgroundColor: color.withAlpha(
+                                                51,
+                                              ),
+                                              child: Icon(
+                                                AppCategories.getIcon(
+                                                  t.category,
+                                                ),
+                                                color: color,
+                                                size: 20,
+                                              ),
                                             ),
                                             title: Text(
-                                              '${t.amount > 0 ? '+' : ''}${formatCurrency(t.amount.abs(), currency!)}',
+                                              t.description?.isNotEmpty == true
+                                                  ? t.description!
+                                                  : loc.getCategoryDisplayName(
+                                                    t.category,
+                                                  ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             subtitle: Text(
                                               intl_fmt.DateFormat(
@@ -1672,11 +1869,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                                 loc.locale.languageCode,
                                               ).format(t.date),
                                             ),
-                                            trailing: Text(
-                                              formatCurrency(
-                                                t.balanceAfter,
-                                                currency!,
-                                              ),
+                                            trailing: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  '${isPositive ? '+' : ''}${formatCurrency(t.amount.abs(), currency!)}',
+                                                  style: TextStyle(
+                                                    color: color,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  // --- MODIFIED --- (Use compact formatter)
+                                                  formatCurrencyCompact(
+                                                    t.balanceAfter,
+                                                    currency!,
+                                                  ),
+                                                  style:
+                                                      Theme.of(
+                                                        context,
+                                                      ).textTheme.bodySmall,
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         );
@@ -1752,12 +1970,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  // --- MODIFIED --- (Whole dialog logic updated for categories)
   Future<void> _modifyBalance(bool add) async {
-    final ctrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final loc = AppLocalizations.of(context);
+    String? selectedCategory = add ? 'salary' : 'food';
 
-    final result = await showDialog<double>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder:
           (ctx) => AlertDialog(
@@ -1765,24 +1986,90 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(20),
             ),
             title: Text(add ? loc.addIncome : loc.addExpense),
-            content: Form(
-              key: formKey,
-              child: TextFormField(
-                controller: ctrl,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: '${loc.amount} ($currency)',
-                  prefixIcon: const Icon(Icons.attach_money),
-                ),
-                validator:
-                    (v) =>
-                        double.tryParse(v ?? '') == null ||
-                                double.parse(v!) <= 0
-                            ? 'Enter valid amount'
-                            : null,
-              ),
+            content: StatefulBuilder(
+              builder: (context, setState) {
+                return SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: amountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: '${loc.amount} ($currency)',
+                            prefixIcon: const Icon(Icons.attach_money),
+                          ),
+                          validator:
+                              (v) =>
+                                  double.tryParse(v ?? '') == null ||
+                                          double.parse(v!) <= 0
+                                      ? 'Enter valid amount'
+                                      : null,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: descCtrl,
+                          decoration: InputDecoration(
+                            labelText: loc.description,
+                            prefixIcon: const Icon(Icons.description_outlined),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          loc.category,
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8.0,
+                          runSpacing: 4.0,
+                          children:
+                              AppCategories.keys.map((key) {
+                                final isSelected = selectedCategory == key;
+                                return ChoiceChip(
+                                  label: Text(loc.getCategoryDisplayName(key)),
+                                  avatar: Icon(
+                                    AppCategories.getIcon(key),
+                                    size: 16,
+                                    color:
+                                        isSelected
+                                            ? Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary
+                                            : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                  ),
+                                  selected: isSelected,
+                                  selectedColor: AppColors.primary,
+                                  labelStyle: TextStyle(
+                                    color:
+                                        isSelected
+                                            ? Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary
+                                            : Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                  ),
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      selectedCategory = key;
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             actions: [
               TextButton(
@@ -1790,11 +2077,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 child: Text(loc.cancel),
               ),
               ElevatedButton(
-                onPressed:
-                    () =>
-                        formKey.currentState!.validate()
-                            ? Navigator.pop(ctx, double.parse(ctrl.text))
-                            : null,
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.pop(ctx, {
+                      'amount': double.parse(amountCtrl.text),
+                      'description': descCtrl.text.trim(),
+                      'category': selectedCategory,
+                    });
+                  }
+                },
                 child: Text(loc.save),
               ),
             ],
@@ -1803,24 +2094,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     if (result == null) return;
 
+    final double amount = result['amount'] as double;
+    final String description = result['description'] as String;
+    final String category = result['category'] as String;
+
     setState(() {
-      balance = (balance ?? 0) + (add ? result : -result);
+      balance = (balance ?? 0) + (add ? amount : -amount);
       transactions.add(
         Transaction(
-          amount: add ? result : -result,
+          amount: add ? amount : -amount,
           date: DateTime.now(),
           balanceAfter: balance!,
+          description: description,
+          category: category,
         ),
       );
       _saveAll();
     });
   }
 
-  Future<void> _exportCsv() async {
-    final buffer = StringBuffer()..writeln('Date,Amount,Balance');
+  // --- MODIFIED --- (Added loc and updated CSV format)
+  Future<void> _exportCsv(AppLocalizations loc) async {
+    final buffer =
+        StringBuffer()..writeln('Date,Amount,Category,Description,Balance');
     for (final t in transactions) {
       buffer.writeln(
-        '${intl_fmt.DateFormat('MMM dd, HH:mm').format(t.date)},${t.amount},${t.balanceAfter}',
+        '${intl_fmt.DateFormat('MMM dd, HH:mm').format(t.date)},${t.amount},${loc.getCategoryDisplayName(t.category)},"${t.description ?? ''}",${t.balanceAfter}',
       );
     }
     final tempDir = Directory.systemTemp;
@@ -1875,6 +2174,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
     final currentBrightness = Theme.of(context).brightness;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.settings)),
@@ -1951,10 +2251,15 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      'Abdallah Driouich',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    isArabic
+                        ? Text(
+                          'عبد الله دروش',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        )
+                        : Text(
+                          'Abdallah Driouich',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                     const SizedBox(height: 8),
                     Text(
                       loc.builtWithLove,
@@ -2018,8 +2323,13 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     if (result != null && result.isNotEmpty) {
       await prefs.setString('username', result);
-      if (!ctx.mounted) return;
-      _restartApp();
+      // --- NEW --- Reschedule notifications with the new name
+      if (ctx.mounted) {
+        await MainApp.of(ctx)?.rescheduleNotifications();
+        if (ctx.mounted) {
+          _restartApp();
+        }
+      }
     }
   }
 
@@ -2069,21 +2379,32 @@ class _SettingsPageState extends State<SettingsPage> {
     if (result != null && result != current) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('currency', result);
-      if (!ctx.mounted) return;
-      _restartApp();
+      // --- NEW --- Reschedule notifications with the new currency
+      if (ctx.mounted) {
+        await MainApp.of(ctx)?.rescheduleNotifications();
+        if (ctx.mounted) {
+          _restartApp();
+        }
+      }
     }
   }
 
   Future<void> _resetData(BuildContext ctx) async {
     final loc = AppLocalizations.of(context);
+    final isArabic = Localizations.localeOf(ctx).languageCode == 'ar';
     final confirm = await showDialog<bool>(
       context: ctx,
       builder:
           (_) => AlertDialog(
             title: Text(loc.reset),
-            content: const Text(
-              'This cannot be undone. All transactions and settings will be deleted.',
-            ),
+            content:
+                isArabic
+                    ? Text(
+                      'لا يمكن التراجع عن هذا الإجراء. سيتم حذف جميع المعاملات والإعدادات.',
+                    )
+                    : const Text(
+                      'This cannot be undone. All transactions and settings will be deleted.',
+                    ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -2100,6 +2421,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
     );
     if (confirm == true) {
+      // --- NEW --- Cancel all notifications before clearing
+      await NotificationService().flutterLocalNotificationsPlugin.cancelAll();
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
       await prefs.setBool('language_set', false);
@@ -2198,7 +2522,8 @@ class _StatCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                formatCurrency(value, currency),
+                // --- MODIFIED --- (Use compact formatter)
+                formatCurrencyCompact(value, currency),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -2250,27 +2575,44 @@ class _ActionButton extends StatelessWidget {
 
 enum ChartPeriod { week, month, year }
 
+// --- MODIFIED --- (Added description and category fields)
 class Transaction {
   final double amount;
   final DateTime date;
   final double balanceAfter;
+  final String? description;
+  final String? category;
+
   Transaction({
     required this.amount,
     required this.date,
     required this.balanceAfter,
+    this.description,
+    this.category,
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) => Transaction(
     amount: json['amount'] as double,
     date: DateTime.parse(json['date'] as String),
     balanceAfter: json['balanceAfter'] as double,
+    description: json['description'] as String?,
+    category: json['category'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
     'amount': amount,
     'date': date.toIso8601String(),
     'balanceAfter': balanceAfter,
+    'description': description,
+    'category': category,
   };
+}
+
+// --- NEW --- (Data model for Syncfusion pie chart)
+class ExpenseChartData {
+  ExpenseChartData(this.category, this.amount);
+  final String category;
+  final double amount;
 }
 
 class HistoryPage extends StatelessWidget {
@@ -2282,6 +2624,173 @@ class HistoryPage extends StatelessWidget {
     super.key,
   });
 
+  // --- MODIFIED --- (Complete rewrite for Syncfusion chart and responsiveness)
+  void _showExpenseChart(
+    BuildContext context,
+    AppLocalizations loc,
+    List<Transaction> transactions,
+    String currency,
+  ) {
+    // 1. Process data
+    final Map<String, double> expenseDataMap = {};
+    final expenses = transactions.where((t) => t.amount < 0);
+
+    if (expenses.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.noTransactions)));
+      return;
+    }
+
+    for (final t in expenses) {
+      final key = t.category ?? 'other';
+      expenseDataMap[key] = (expenseDataMap[key] ?? 0) + t.amount.abs();
+    }
+
+    // Convert map to list for Syncfusion
+    final List<ExpenseChartData> pieData =
+        expenseDataMap.entries
+            .map((entry) => ExpenseChartData(entry.key, entry.value))
+            .toList();
+
+    int _selectedIdx = -1;
+
+    // 2. Show Dialog
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        // Get screen width for responsive sizing
+        final width = MediaQuery.of(context).size.width;
+
+        return StatefulBuilder(
+          builder: (stfContext, stfSetState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      loc.expense, // "Expense"
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 24),
+                    // Responsive SizedBox
+                    SizedBox(
+                      // Use 80% of screen width, max 350
+                      width: math.min(width * 0.8, 350),
+                      height: math.min(width * 0.8, 350),
+                      child: SfCircularChart(
+                        tooltipBehavior: TooltipBehavior(
+                          enable: true,
+                          // --- MODIFIED --- (Use regular formatCurrency for tooltips)
+                          builder: (
+                            dynamic data,
+                            dynamic point,
+                            dynamic series,
+                            int pointIndex,
+                            int seriesIndex,
+                          ) {
+                            final ExpenseChartData eData =
+                                data as ExpenseChartData;
+                            return Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 3,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '${loc.getCategoryDisplayName(eData.category)}: ${formatCurrency(eData.amount, currency)}',
+                                style: TextStyle(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).textTheme.bodyLarge?.color,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        // Use built-in legend
+                        legend: Legend(
+                          isVisible: true,
+                          overflowMode: LegendItemOverflowMode.wrap,
+                          position: LegendPosition.bottom,
+                        ),
+                        series: <CircularSeries>[
+                          DoughnutSeries<ExpenseChartData, String>(
+                            dataSource: pieData,
+                            xValueMapper:
+                                (ExpenseChartData data, _) =>
+                                    loc.getCategoryDisplayName(data.category),
+                            yValueMapper:
+                                (ExpenseChartData data, _) => data.amount,
+                            pointColorMapper:
+                                (ExpenseChartData data, _) =>
+                                    AppCategories.getColor(data.category),
+                            // Explode on tap
+                            explode: true,
+                            explodeIndex: _selectedIdx,
+                            // Data labels (e.g., percentages)
+                            dataLabelSettings: const DataLabelSettings(
+                              isVisible: true,
+                              labelPosition: ChartDataLabelPosition.outside,
+                              // Use %
+                              labelIntersectAction: LabelIntersectAction.shift,
+                              connectorLineSettings: ConnectorLineSettings(
+                                type: ConnectorType.curve,
+                                length: '10%',
+                              ),
+                            ),
+                            dataLabelMapper: (ExpenseChartData data, _) {
+                              final total = pieData.fold<double>(
+                                0,
+                                (sum, item) => sum + item.amount,
+                              );
+                              final percent = (data.amount / total * 100)
+                                  .toStringAsFixed(0);
+                              return '$percent%';
+                            },
+                            innerRadius: '40%',
+                            radius: '80%',
+                            // Selection behavior
+                            selectionBehavior: SelectionBehavior(
+                              enable: true,
+                              unselectedOpacity: 0.5,
+                            ),
+                            onPointTap: (ChartPointDetails args) {
+                              stfSetState(() {
+                                _selectedIdx = args.pointIndex ?? -1;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(loc.cancel),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
@@ -2289,32 +2798,49 @@ class HistoryPage extends StatelessWidget {
       ..sort((a, b) => b.date.compareTo(a.date));
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.fullHistory)),
+      appBar: AppBar(
+        title: Text(loc.fullHistory),
+        // --- MODIFIED --- (Button to trigger the pie chart)
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.pie_chart_outline),
+            onPressed:
+                () => _showExpenseChart(
+                  context,
+                  loc,
+                  sortedTransactions,
+                  currency,
+                ),
+          ),
+        ],
+      ),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: sortedTransactions.length,
         separatorBuilder: (_, __) => const Divider(),
         itemBuilder: (_, i) {
           final t = sortedTransactions[i];
+          // --- MODIFIED --- (ListTile layout changed for consistency)
+          final isPositive = t.amount > 0;
+          final color = isPositive ? AppColors.positive : AppColors.negative;
+
           return ScaleFadeIn(
             delay: i * 0.02,
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor:
-                    t.amount > 0
-                        ? AppColors.positive.withAlpha(
-                          51,
-                        ) // FIX: withOpacity(0.2)
-                        : AppColors.negative.withAlpha(
-                          51,
-                        ), // FIX: withOpacity(0.2)
+                backgroundColor: color.withAlpha(51),
                 child: Icon(
-                  t.amount > 0 ? Icons.add : Icons.remove,
-                  color: t.amount > 0 ? AppColors.positive : AppColors.negative,
+                  AppCategories.getIcon(t.category),
+                  color: color,
+                  size: 20,
                 ),
               ),
               title: Text(
-                '${t.amount > 0 ? '+' : ''}${formatCurrency(t.amount.abs(), currency)}',
+                t.description?.isNotEmpty == true
+                    ? t.description!
+                    : loc.getCategoryDisplayName(t.category),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
                 intl_fmt.DateFormat(
@@ -2322,9 +2848,21 @@ class HistoryPage extends StatelessWidget {
                   loc.locale.languageCode,
                 ).format(t.date),
               ),
-              trailing: Text(
-                formatCurrency(t.balanceAfter, currency),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${isPositive ? '+' : ''}${formatCurrency(t.amount.abs(), currency)}',
+                    style: TextStyle(color: color, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    // --- MODIFIED --- (Use compact formatter)
+                    formatCurrencyCompact(t.balanceAfter, currency),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
           );
@@ -2333,3 +2871,4 @@ class HistoryPage extends StatelessWidget {
     );
   }
 }
+
