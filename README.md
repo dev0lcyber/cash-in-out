@@ -1,7 +1,139 @@
-💰 Cash-In-Out: Track Your Finances Effortlessly💡 About Cash-In-OutCash-In-Out is a simple, beautiful, and powerful cross-platform application designed to help you monitor and manage your personal income and expenses with ease. Forget complex spreadsheets and confusing interfaces—this app provides a clean, focused way to keep track of your cash flow, ensuring you always know where your money is going.Built with Flutter, Cash-In-Out offers a native experience on mobile (Android and iOS), desktop (Windows, macOS, Linux), and web.✨ Key FeaturesThe app is focused on providing a smooth and efficient tracking experience:Quick Transaction Logging: Easily record new income or expense transactions in seconds.Intuitive Categorization: Organize your spending with custom or pre-defined categories (e.g., Groceries, Rent, Salary).Real-Time Summary: View an instant balance of your total income, total expenses, and current net flow.Transaction History: Browse a comprehensive, filterable list of all your recorded entries.Cross-Platform Support: Enjoy a consistent look and feel across all your devices, thanks to the Flutter framework.📱 Screenshots & DemoCheck out the app interface and see Cash-In-Out in action:Application Demo VideoSee how easy it is to navigate and log transactions:<p align="center"><video src="Mockups/video.mp4" controls width="800" title="Cash-In-Out Demo Video"></video></p>Interface GalleryA selection of key screens from the application. (Images are located in the Mockups/ folder):Main Dashboard (1)Transaction List (2)Add Expense Screen (3)Category Breakdown (4)Settings & Profiles (5)⚙️ Getting StartedThis is a Flutter project. To get a copy up and running on your local machine for development and testing, follow these steps.Quick Download (Android APK)If you want to quickly try the app on an Android device, you can download the pre-built application package directly from the main branch:Download cashinout.apkNote: You may need to enable "Install from unknown sources" in your device settings to install the APK.For Developers: Building from SourceTo build and run the application yourself, start here.PrerequisitesYou need the Flutter SDK installed on your system.Install FlutterCheck your setup:flutter doctor
-InstallationClone the repository:git clone [https://github.com/dev0lcyber/cash-in-out.git](https://github.com/dev0lcyber/cash-in-out.git)
+# 💰 Cash-In-Out  
+### Track Your Finances Effortlessly
+
+## 💡 About Cash-In-Out
+Cash-In-Out is a simple, elegant, and powerful cross-platform application that helps you track your income and expenses with ease. Instead of dealing with complicated spreadsheets, this app gives you a clean and focused way to monitor your cash flow at any moment.
+
+Built with **Flutter**, the app runs smoothly on **Android, iOS, Windows, macOS, Linux, and Web**, delivering a consistent and polished experience everywhere.
+
+---
+
+## ✨ Key Features
+
+### Core Features
+- **Quick Transaction Logging**  
+  Add income or expenses instantly with a lightweight, intuitive form.
+
+- **Category Management**  
+  Use built-in categories or create custom ones to organize your finances.
+
+- **Real-Time Summary Dashboard**  
+  Instantly view your total income, total expenses, and net balance.
+
+- **Transaction History**  
+  Browse, filter, and search through all past entries.
+
+- **Cross-Platform Support**  
+  Same smooth experience on mobile, desktop, and web.
+
+### Additional Features
+- **Dark & Light Themes**  
+  Adapts automatically to your system theme.
+
+- **Local Storage Persistence**  
+  Saves your data locally for instant loading.
+
+- **Offline-First Design**  
+  Works fully offline.
+
+- **Export & Backup (Planned)**  
+  CSV export + cloud backup support coming soon.
+
+---
+
+## 📱 Screenshots & Demo
+
+### 🎥 Video Demo
+Watch the full demo on Vimeo:  
+👉 https://vimeo.com/1138052827
+
+### Local Video Link
+[Demo Video](Mockups/video.mp4)
+
+### 🖼️ Interface Gallery
+Images inside the `Mockups/` folder:
+
+![Dashboard](Mockups/1.png)
+![Transaction List](Mockups/2.png)
+![Add Expense](Mockups/3.png)
+![Category Breakdown](Mockups/4.png)
+![Settings](Mockups/5.png)
+
+---
+
+## ⚙️ Getting Started
+
+### 📥 Quick Download (Android APK)
+Download the latest build:
+
+```
+cashinout.apk
+```
+
+You may need to enable “Install from unknown sources” on Android.
+
+---
+
+## 🧑‍💻 Build From Source
+
+### Prerequisites
+- Flutter SDK  
+- Dart SDK (included with Flutter)
+
+Check your system:
+```sh
+flutter doctor
+```
+
+### Install the Project
+```sh
+git clone https://github.com/dev0lcyber/cash-in-out.git
 cd cash-in-out
-Install dependencies:flutter pub get
-Run the application:You can run the app on an emulator, physical device, or desktop/web platform:flutter run
-# Example for web: flutter run -d web
-🛠️ Built WithFlutter - UI toolkit for building natively compiled applications for mobile, web, and desktop from a single codebase.Dart - The programming language used by Flutter.👤 DeveloperCash-In-Out was developed by:Abdallah Driouich- View Portfolio🤝 ContributingContributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.Fork the ProjectCreate your Feature Branch (git checkout -b feature/AmazingFeature)Commit your Changes (git commit -m 'Add some AmazingFeature')Push to the Branch (git push origin feature/AmazingFeature)Open a Pull Request📝 LicenseDistributed under the MIT License. See LICENSE for more information.
+flutter pub get
+```
+
+### Run the App
+```sh
+flutter run
+```
+
+For web:
+```sh
+flutter run -d web
+```
+
+---
+
+## 🛠️ Built With
+- **Flutter** – UI toolkit for high-quality apps  
+- **Dart** – Optimized language for UI development  
+
+---
+
+## 👤 Developer
+**Abdallah Driouich**  
+Portfolio: https://abdallah.driouich.site
+
+---
+
+## 🤝 Contributing
+1. Fork the repository  
+2. Create a feature branch:
+   ```sh
+   git checkout -b feature/NewFeature
+   ```
+3. Commit:
+   ```sh
+   git commit -m "Add NewFeature"
+   ```
+4. Push:
+   ```sh
+   git push origin feature/NewFeature
+   ```
+5. Open a Pull Request
+
+---
+
+## 📝 License
+Licensed under the **MIT License**.  
+See `LICENSE` for details.
