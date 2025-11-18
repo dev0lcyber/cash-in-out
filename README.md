@@ -49,15 +49,14 @@ Built with **Flutter**, the app runs smoothly on **Android, iOS, Windows, macOS,
 
 ### 🎥 Video Demo
 Watch the full demo on Vimeo:
-👉 [
-  // This is the image of the video player
-  ![Video Thumbnail - Click to Watch!](Mockups/thumb.png)
-]
-  // This is the link to the actual video URL
-(https://vimeo.com/1138052827)
 
-### Local Video Link
-[Demo Video](Mockups/video.mp4)
+<div align="center">
+  <a href="https://vimeo.com/1138052827">
+    <img src="Mockups/thumb.png" alt="Video Thumbnail - Click to Watch!" width="300" style="max-width: 100%;">
+  </a>
+</div>
+
+---
 
 ### 🖼️ Interface Gallery
 Images inside the `Mockups/` folder:
@@ -71,14 +70,13 @@ Images inside the `Mockups/` folder:
 </div>
 
 ---
+
 ## ⚙️ Getting Started
 
 ### 📥 Quick Download (Android APK)
 Download the latest build:
 
-```
-cashinout.apk
-```
+[![Download APK](https://img.shields.io/badge/Download_APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/dev0lcyber/cash-in-out/raw/main/cashinout.apk)
 
 You may need to enable “Install from unknown sources” on Android.
 
@@ -147,6 +145,7 @@ Portfolio: https://abdallah.driouich.site
 ## 📝 License
 Licensed under the **MIT License**.  
 See `LICENSE` for details.
+
 
 
 
